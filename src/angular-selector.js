@@ -125,7 +125,7 @@
                     
                     if (angular.isDefined(scope.disabled)){
                         scope.$watch('disabled', function(newModel, oldModel){
-                            if(newModel === false){
+                            if(newModel !== oldModel && newModel === false){
                                 scope.fetch();
                             }
                         });

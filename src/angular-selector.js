@@ -14,7 +14,7 @@
 		
 		// Selector directive
 		function Selector(filter, timeout, window, http, q) {
-			this.restrict   = 'EAC';
+			this.restrict   = 'EA';
 			this.replace    = true;
 			this.transclude = true;
 			this.scope      = {
@@ -27,10 +27,8 @@
 				labelAttr:             '@?',
 				groupAttr:             '@?',
 				options:               '=?',
-				create:                '&?',
 				rtl:                   '=?',
 				api:                   '=?',
-				change:                '&?',
 				remote:                '=?',
 				remoteParam:           '@?',
 				removeButton:          '=?',
@@ -90,12 +88,15 @@
 					else scope.value = scope.valueAttr == null ? (value || []) : (value || []).map(function (option) { return option[scope.valueAttr]; });
 				};
 				scope.hasValue = function () {
-					return scope.multiple ? (scope.value || []).length > 0 : (scope.valueAttr == null ? !angular.equals({}, scope.value) : !!scope.value);
+					return scope.multiple ? (scope.value || []).length > 0 : (scope.valueAttr == null ? !angular.equals({}, scope.value) : scope.value);
 				};
 				
 				// Remote fetching
 				scope.fetch = function () {
 					var settings = { method: 'GET', cache: true, params: {} };
+
+                    if (angular.isDefined(scope.disabled) && scope.disabled === true) return;
+
 					if (!angular.isDefined(scope.remote) || !angular.isObject(scope.remote))
 						throw 'Remote attribute is not an object';
 					angular.extend(settings, scope.remote);
@@ -119,8 +120,17 @@
 					scope.remote = false;
 					initDeferred.resolve();
 				}
-				if (scope.remote)
+				if (scope.remote){
 					scope.$watch('search', scope.fetch);
+                    
+                    if (angular.isDefined(scope.disabled)){
+                        scope.$watch('disabled', function(newModel, oldModel){
+                            if(newModel === false){
+                                scope.fetch();
+                            }
+                        });
+                    }
+                }
 				
 				// Fill with options in the select
 				scope.optionToObject = function (option, group) {
@@ -269,19 +279,8 @@
 							break;
 						case KEYS.enter:
 							if (scope.isOpen) {
-								if (scope.filteredOptions.length) {
+								if (scope.filteredOptions.length)
 									scope.set();
-								} else if (attrs.create) {
-									var option = {};
-									if (angular.isFunction(scope.create)) {
-										option = scope.create({ input: e.target.value });
-									} else {
-										option[scope.labelAttr] = e.target.value;
-										option[scope.valueAttr || 'value'] = e.target.value;
-									}
-									scope.options.push(option);
-									scope.set(option);
-								}
 								e.preventDefault();
 							}
 							break;
@@ -338,7 +337,7 @@
 						styles = getStyles(input[0]),
 						shadow = angular.element('<span class="selector-shadow"></span>');
 					shadow.text(input.val() || (!scope.hasValue() ? scope.placeholder : '') || '');
-					angular.element(document.body).append(shadow);
+					input.parent().append(shadow);
 					angular.forEach(['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'letterSpacing', 'textTransform', 'wordSpacing', 'textIndent'], function (style) {
 						shadow.css(style, styles[style]);
 					});
@@ -372,10 +371,6 @@
 				scope.$watch('selectedValues', function (newValue, oldValue) {
 					if (angular.equals(newValue, oldValue)) return;
 					scope.updateValue();
-					if (angular.isFunction(scope.change))
-						scope.change(scope.multiple
-							? { newValue: newValue, oldValue: oldValue }
-							: { newValue: newValue[0], oldValue: oldValue[0] });
 				}, true);
 				scope.$watch('options', function (newValue, oldValue) {
 					if (angular.equals(newValue, oldValue) || scope.remote) return;
@@ -459,9 +454,9 @@
 		.module('selector', [])
 		.run(['$templateCache', function ($templateCache) {
 			$templateCache.put('selector/selector.html',
-				'<div class="selector-container" ng-attr-dir="{{rtl ? \'rtl\' : \'ltr\'}}" ' +
-					'ng-class="{open: isOpen, empty: !filteredOptions.length && (!create || !search), multiple: multiple, \'has-value\': hasValue(), rtl: rtl, ' +
-						'loading: loading, \'remove-button\': removeButton, disabled: disabled}">' +
+				'<div class="selector" ng-attr-dir="{{rtl ? \'rtl\' : \'ltr\'}}" ' +
+					'ng-class="{open: isOpen, empty: !filteredOptions.length, multiple: multiple, \'has-value\': hasValue(), rtl: rtl, loading: loading, ' +
+						'\'remove-button\': removeButton, disabled: disabled}">' +
 					'<select name="{{name}}" ng-hide="true" ' +
 						'ng-model="selectedValues" multiple ng-options="option as option[labelAttr] for option in selectedValues" ng-hide="true"></select>' +
 					'<label class="selector-input">' +
@@ -473,15 +468,12 @@
 								'</div>' +
 							'</li>' +
 						'</ul>' +
-						'<input ng-model="search" placeholder="{{!hasValue() ? placeholder : \'\'}}" ng-disabled="disabled">' +
+						'<input class="selector" ng-model="search" placeholder="{{!hasValue() ? placeholder : \'\'}}" ng-disabled="disabled">' +
 						'<div ng-if="!multiple || loading" class="selector-helper selector-global-helper" ng-click="!disabled && removeButton && unset()">' +
 							'<span class="selector-icon"></span>' +
 						'</div>' +
 					'</label>' +
-					'<ul class="selector-dropdown" ng-show="filteredOptions.length > 0 || (create && search)">' +
-						'<li class="selector-option active" ng-if="filteredOptions.length == 0">' +
-							'Add <i ng-bind="search"></i>' +
-						'</li>' +
+					'<ul class="selector-dropdown" ng-show="filteredOptions.length > 0">' +
 						'<li ng-repeat-start="(index, option) in filteredOptions track by index" class="selector-optgroup" ' +
 							'ng-include="dropdownGroupTemplate" ng-show="option[groupAttr] && index == 0 || filteredOptions[index-1][groupAttr] != option[groupAttr]"></li>' +
 						'<li ng-repeat-end ng-class="{active: highlighted == index, grouped: option[groupAttr]}" class="selector-option" ' +
@@ -489,7 +481,7 @@
 					'</ul>' +
 				'</div>'
 			);
-			$templateCache.put('selector/item-default.html', '<span ng-bind="option[labelAttr] || option"></span>');
+			$templateCache.put('selector/item-default.html', '<span ng-bind="option[labelAttr]"></span>');
 			$templateCache.put('selector/group-default.html', '<span ng-bind="option[groupAttr]"></span>');
 		}])
 		.directive('selector', ['$filter', '$timeout', '$window', '$http', '$q', function ($filter, $timeout, $window, $http, $q) {

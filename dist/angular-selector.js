@@ -47,6 +47,7 @@
 		Selector.prototype.link = function (scope, element, attrs, controller, transclude) {
 			transclude(scope, function (clone, scope) {
 				var input        = angular.element(element[0].querySelector('.selector-input input')),
+                    label        = angular.element(element[0].querySelector('.selector-input')),
 					dropdown     = angular.element(element[0].querySelector('.selector-dropdown')),
 					initDeferred = $q.defer(),
 					defaults     = {
@@ -392,6 +393,20 @@
 					scope.updateSelected();
 				}, true);
 				
+			    angular.element($window).on('click', function(e) {
+                    var target = e.target;
+
+                    while( target !== null && target !== undefined ) {
+                        if( target === element[0] ){
+                            return false;
+                        }
+                        target = target.parentElement;
+                    }
+                    scope.$apply(scope.close);
+                    e.preventDefault();
+                    return true;
+                });
+
 				// DOM event listeners
 				input
 					.on('focus', function () {
@@ -400,7 +415,7 @@
 						});
 					})
 					.on('blur', function () {
-						scope.$apply(scope.close);
+						//scope.$apply(scope.close);
 					})
 					.on('keydown', function (e) {
 						scope.$apply(function () {
@@ -410,6 +425,12 @@
 					.on('input', function () {
 						scope.setInputWidth();
 					});
+                label
+                    .on('click', function(){
+						$timeout(function () {
+							scope.$apply(scope.open);
+						});
+                    });
 				dropdown
 					.on('mousedown', function (e) {
 						e.preventDefault();

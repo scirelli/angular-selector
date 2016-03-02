@@ -403,8 +403,6 @@
                         target = target.parentElement;
                     }
                     scope.$apply(scope.close);
-                    e.preventDefault();
-                    return true;
                 });
 
 				// DOM event listeners
